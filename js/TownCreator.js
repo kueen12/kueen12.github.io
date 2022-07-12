@@ -20,13 +20,31 @@ export class TownCreator {
         this.height = 0
 
         this.canvas.addEventListener('mousedown', (event) => {
+            // console.log('mousedown')
             this.mousedown(event)
         })
         this.canvas.addEventListener('mousemove', (event) => {
+            // console.log('mousemove')
             this.mousemove(event)
         })
         this.canvas.addEventListener('mouseup', (event) => {
+            // console.log('mouseup')
             this.mouseup(event)
+        })
+
+        this.canvas.addEventListener('touchstart', (event) => {
+            // console.log('touchstart')
+            this.touchstart(event)
+        })
+
+        this.canvas.addEventListener('touchmove', (event) => {
+            // console.log('touchmove')
+            this.touchmove(event)
+        })
+        this.canvas.addEventListener('touchend', (event) => {
+            // console.log('touchend')
+            this.touchend(event)
+
         })
 
         window.onresize = (event) => {
@@ -131,6 +149,95 @@ export class TownCreator {
 
         if (this.mouseState == MouseState.CLICK) {
             let grid = this.town.attach(event.offsetX,event.offsetY)
+            this.town.addTile({
+                id: this.tile.id,
+                dir: this.tile.dir,
+                r: grid.r,
+                c: grid.c,
+                d: grid.d
+            })
+        }
+        this.mouseState = MouseState.NONE
+        this.lastPoint = null
+    }
+
+    
+    touchstart(event) {
+        if (this.gui.mousedown({
+            offsetX: event.changedTouches[0].clientX,
+            offsetY: event.changedTouches[0].clientY
+        })) {
+            this.town.highlightSurface = null
+            return
+        }
+
+        this.mouseState = MouseState.PRESS
+        this.longClickId = setTimeout(()=>{
+            this.mouseState = MouseState.LONGCLICK
+            let tile = this.town.removeTile(event.changedTouches[0].clientX,event.changedTouches[0].clientY)
+            if (tile) {
+                this.tile.dir = tile.dir
+                this.gui.tilePanel.setSelectIdx(tile.id)
+            }
+        }, 350)
+        this.lastPoint = {
+            x: event.changedTouches[0].clientX,
+            y: event.changedTouches[0].clientY
+        }
+        this.initPoint = {
+            x: event.changedTouches[0].clientX,
+            y: event.changedTouches[0].clientY   
+        }
+    }
+
+    touchmove(event) {
+        if (this.gui.mousemove({
+            offsetX: event.changedTouches[0].clientX,
+            offsetY: event.changedTouches[0].clientY
+        })) return
+        if (this.mouseState == MouseState.NONE) {
+            this.mouseState = MouseState.HOVER
+        }
+        if (this.mouseState == MouseState.PRESS) {
+            let dx = event.changedTouches[0].clientX - this.initPoint.x
+            let dy = event.changedTouches[0].clientY - this.initPoint.y
+            if (dx * dx + dy * dy >= 100) {
+                this.mouseState = MouseState.MOVE
+                if (this.longClickId) {
+                    clearTimeout(this.longClickId)
+                    this.longClickId = null
+                }
+            }
+        }
+        if (this.mouseState == MouseState.MOVE) {
+            this.town.move(event.changedTouches[0].clientX - this.lastPoint.x, event.changedTouches[0].clientY - this.lastPoint.y)
+        }
+        this.lastPoint = {
+            x: event.changedTouches[0].clientX,
+            y: event.changedTouches[0].clientY
+        }
+        this.town.highlight(event.changedTouches[0].clientX, event.changedTouches[0].clientY)
+        let grid = this.town.attach(event.changedTouches[0].clientX, event.changedTouches[0].clientY)
+        this.tile.r = grid.r
+        this.tile.c = grid.c
+        this.tile.d = grid.d
+    }
+
+    touchend(event) {
+        if (this.gui.mouseup({
+            offsetX: event.changedTouches[0].clientX,
+            offsetY: event.changedTouches[0].clientY
+        })) return
+        if (this.mouseState == MouseState.PRESS) {
+            if (this.longClickId) {
+                clearTimeout(this.longClickId)
+                this.longClickId = null
+            }
+            this.mouseState = MouseState.CLICK
+        }
+
+        if (this.mouseState == MouseState.CLICK) {
+            let grid = this.town.attach(event.changedTouches[0].clientX, event.changedTouches[0].clientY)
             this.town.addTile({
                 id: this.tile.id,
                 dir: this.tile.dir,
