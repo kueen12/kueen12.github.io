@@ -18,6 +18,7 @@ export class TownCreator {
 
         this.width = 0
         this.height = 0
+        this.isTouch = false
 
         this.canvas.addEventListener('mousedown', (event) => {
             // console.log('mousedown')
@@ -84,6 +85,7 @@ export class TownCreator {
     }
 
     mousedown(event) {
+        if (this.isTouch) return
         if (this.gui.mousedown(event)) {
             this.town.highlightSurface = null
             return
@@ -109,6 +111,7 @@ export class TownCreator {
     }
 
     mousemove(event) {
+        if (this.isTouch) return
         if (this.gui.mousemove(event)) return
         if (this.mouseState == MouseState.NONE) {
             this.mouseState = MouseState.HOVER
@@ -138,6 +141,10 @@ export class TownCreator {
         this.tile.d = grid.d
     }
     mouseup(event) {
+        if (this.isTouch) {
+            this.isTouch = false
+            return
+        }
         if (this.gui.mouseup(event)) return
         if (this.mouseState == MouseState.PRESS) {
             if (this.longClickId) {
@@ -163,6 +170,7 @@ export class TownCreator {
 
     
     touchstart(event) {
+        this.isTouch = true
         if (this.gui.mousedown({
             offsetX: event.changedTouches[0].clientX,
             offsetY: event.changedTouches[0].clientY
@@ -191,6 +199,8 @@ export class TownCreator {
     }
 
     touchmove(event) {
+        this.isTouch = true
+
         if (this.gui.mousemove({
             offsetX: event.changedTouches[0].clientX,
             offsetY: event.changedTouches[0].clientY
@@ -224,6 +234,8 @@ export class TownCreator {
     }
 
     touchend(event) {
+        this.isTouch = true
+
         if (this.gui.mouseup({
             offsetX: event.changedTouches[0].clientX,
             offsetY: event.changedTouches[0].clientY
