@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Lightening</title>
+	<style type="text/css">
+		html, body {
+			height: 100%;
+			width: 100%;
+			margin: 0px;
+			padding: 0px;
+			background-color: #393f4c;
+		}
+	</style>
+</head>
+<body>
+	<canvas id='canvas'></canvas>
+	<script type="text/javascript">
+		
+		function renderColor(ctx, colorBlock, color, num) {
+			ctx.fillStyle = color
+			ctx.fillRect(colorBlock.x, colorBlock.y, colorBlock.width, colorBlock.height)
+			ctx.font = colorBlock.width + "px serif"
+			ctx.fillStyle = '#e6eae3'
+			ctx.textBaseline = 'middle'
+			ctx.textAlign = 'center'
+			ctx.fillText(num, colorBlock.x + colorBlock.width / 2, colorBlock.y + colorBlock.height / 2)
+		}
+
+		function renderItem(ctx, itemBlock, num) {
+			ctx.fillStyle = '#f6f6f6'
+			ctx.fillRect(itemBlock.x, itemBlock.y, itemBlock.width, itemBlock.height)
+			ctx.font = itemBlock.width + "px serif"
+			ctx.fillStyle = '#393e46'
+			ctx.textBaseline = 'middle'
+			ctx.textAlign = 'center'
+			ctx.fillText(num, itemBlock.x + itemBlock.width / 2, itemBlock.y + itemBlock.height / 2)
+		}
+
+		function render(ctx) {
+			colors = [
+				'#bf242a',
+				'#96514d',
+				'#e6b422',
+				'#006e54',
+				'#895b8a',
+				'#8d6449',
+				'#8b968d',
+				'#ee827c',
+				'#44617b',
+				'#cd5e3c',
+				'#008899'
+			]
+			for (let i = 0; i < ctx.colNum; ++i) {
+				renderColor(ctx.context, ctx.colColors[i], colors[ctx.upDepth[i]], ctx.upLimit[i])
+			}
+			for (let i = 0; i < ctx.rowNum; ++i) {
+				renderColor(ctx.context, ctx.rowColors[i], colors[ctx.leftDepth[i]], ctx.leftLimit[i])
+			}
+
+			let validView = subMatrix(ctx.topView, ctx.usedView, ctx.rowNum, ctx.colNum)
+
+			for (let i = 0; i < ctx.rowNum; ++i) {
+				for (let j = 0; j < ctx.colNum; ++j) {
+					renderItem(ctx.context, ctx.items[i][j], validView[i][j])
+				}
+			}
+		}
+
+
+		function clearScreen(ctx) {
+			ctx.context.clearRect(0, 0, ctx.width, ctx.height);
+		}
+
+		function run(timestamp, ctx) {
+			clearScreen(ctx)
+			ctx.context.fillStyle = '#9e9478'
+			if (ctx.gameState == 'Ready') {
+				ctx.gameState = 'Running'
+			} else if (ctx.gameState == 'Running') {
+				render(ctx)
+			} else if (ctx.gameState == 'Restart') {
+
+			} else if (ctx.gameState == 'Pause') {
+
+			}
+		}
+
+		function sendMessage(ctx, msg, duration) {
+			ctx.tips.push({
+				msg: msg,
+				duration: duration
+			})
+		}
+
+
+		function subMatrix(a, b, row, col) {
+			let c = []
+			for (let i = 0; i < row; ++i) {
+				let line = []
+				for (let j = 0; j < col; ++j) {
+					line.push(a[i][j] - b[i][j])
+				}
+				c.push(line)
+			}
+			return c
+		}
+
+		function getItem(ctx, row, col) {
+			if (row < 0 || row >= ctx.rowNum ||
+				col < 0 || col >= ctx.colNum) {
+				sendMessage(ctx, 'invalid message!', 1)
+				return
+			}
+
+			if (ctx.leftLimit[row] <= 0 || ctx.upLimit[col] <= 0) {
+				sendMessage(ctx, 'invalid message!', 1)
+				return
+			}
+			if (ctx.leftDepth[row] != ctx.upDepth[col]) {
+				sendMessage(ctx, 'invalid message!', 1)
+				return
+			}
+
+			let validView = subMatrix(ctx.topView, ctx.usedView, ctx.rowNum, ctx.colNum )
+			console.log(validView)
+
+			if (validView[row][col] <= 0) {
+				sendMessage(ctx, 'invalid message!', 1)
+				return
+			}
+
+			ctx.usedView[row][col] += 1
+			ctx.leftLimit[row] -= 1
+			ctx.upLimit[col] -= 1
+
+			if (ctx.leftLimit[row] == 0) {
+				item = updateLimit(ctx.leftDepth[row] + 1, ctx.leftView[row])
+				ctx.leftLimit[row] = item.limit
+				ctx.leftDepth[row] = item.depth
+			}
+
+			if (ctx.upLimit[col] == 0) {
+				item = updateLimit(ctx.upDepth[col] + 1, ctx.upView[col])
+				ctx.upLimit[col] = item.limit
+				ctx.upDepth[col] = item.depth
+			}
+		}
+
+		function handleClick(event, ctx) {
+			for (let i = 0; i < ctx.rowNum; ++i) {
+				for (let j = 0; j < ctx.rowNum; ++j) {
+					if (event.offsetX >= ctx.items[i][j].x &&
+						event.offsetY >= ctx.items[i][j].y &&
+						event.offsetX < ctx.items[i][j].x + ctx.items[i][j].width &&
+						event.offsetY < ctx.items[i][j].y + ctx.items[i][j].height) {
+						getItem(ctx, i, j)
+						return
+					}
+				}
+			}
+
+		}
+
+		function initSize(ctx) {
+			ctx.validHeight = document.body.clientHeight
+			ctx.validWidth = document.body.clientWidth
+
+			ctx.height = Math.floor(ctx.validHeight / 16) * 16
+			ctx.width = ctx.height * 9 / 16
+
+			ctx.x = (ctx.validWidth - ctx.width) / 2
+			ctx.y = 0
+
+			ctx.canvas.height = ctx.height
+			ctx.canvas.width = ctx.width
+			ctx.canvas.style.top = ctx.y + 'px'
+			ctx.canvas.style.left = ctx.x + 'px'
+			ctx.canvas.style.position = "relative"
+
+			baseSize = Math.floor(ctx.width / (ctx.colNum + 1))
+			ctx.blockSpace = 5
+			ctx.margin = 5
+
+			ctx.itemBlockSize = baseSize
+			ctx.colorBlockSize = ctx.width - ctx.margin * 2 - (baseSize + ctx.blockSpace) * ctx.colNum
+
+			panelSize = ctx.colorBlockSize + (ctx.itemBlockSize + ctx.blockSpace) * ctx.colNum
+
+			ctx.panelX = ctx.margin
+			ctx.panelY = (ctx.height - panelSize) / 2
+			
+			ctx.rowColors = []
+			ctx.colColors = []
+
+			for (let i = 0; i < ctx.rowNum; ++i) {
+				ctx.rowColors.push({
+					x: ctx.panelX,
+					y: ctx.panelY + ctx.colorBlockSize + ctx.blockSpace + (ctx.itemBlockSize - ctx.colorBlockSize) / 2 + i * (ctx.itemBlockSize + ctx.blockSpace),
+					width: ctx.colorBlockSize,
+					height: ctx.colorBlockSize
+				})
+			}
+			for (let i = 0; i < ctx.colNum; ++i) {
+				ctx.colColors.push({
+					y: ctx.panelY,
+					x: ctx.panelX + ctx.colorBlockSize + ctx.blockSpace + (ctx.itemBlockSize - ctx.colorBlockSize) / 2 + i * (ctx.itemBlockSize + ctx.blockSpace),
+					width: ctx.colorBlockSize,
+					height: ctx.colorBlockSize
+				})
+			}
+
+			ctx.items = []
+			for (let i = 0; i < ctx.rowNum; ++i) {
+				let tmp = []
+				for (let j = 0; j < ctx.colNum; ++j) {
+					tmp.push({
+						x: ctx.panelX + ctx.colorBlockSize + ctx.blockSpace + (ctx.itemBlockSize + ctx.blockSpace) * j,
+						y: ctx.panelY + ctx.colorBlockSize + ctx.blockSpace + (ctx.itemBlockSize + ctx.blockSpace) * i,
+						width: ctx.itemBlockSize,
+						height: ctx.itemBlockSize
+					})
+				}
+				ctx.items.push(tmp)
+			}
+		}
+
+
+		function updateLimit(depth, view) {
+			if (depth >= view.length) return {
+				depth: depth,
+				limit: 0
+			}
+			limit = view[depth]
+			while (depth < view.length && limit == 0) {
+				depth += 1
+				limit = view[depth]
+			}
+			return {
+				depth: depth,
+				limit: limit
+			}
+		}
+
+		function initToken(ctx) {
+			ctx.matrix = []
+			for (let i = 0; i < ctx.rowNum; ++i) {
+				let layer = []
+				for (let j = 0; j < ctx.colNum; ++j) {
+					let line = []
+					for (let k = 0; k < ctx.layerNum; ++k) {
+						line.push(Math.random() > 0.5)
+					}
+					layer.push(line)
+				}
+				ctx.matrix.push(layer)
+			}
+
+			ctx.topView = []
+			for (let i = 0; i < ctx.rowNum; ++i) {
+				let line = []
+				for (let j = 0; j < ctx.colNum; ++j) {
+					let acc = 0
+					for (let k = 0; k < ctx.layerNum; ++k) {
+						if (ctx.matrix[i][j][k])
+							acc += 1
+					}
+					line.push(acc)
+				}
+				ctx.topView.push(line)
+			}
+
+			ctx.leftView = []
+			for (let i = 0; i < ctx.rowNum; ++i) {
+				let line = []
+				for (let j = 0; j < ctx.layerNum; ++j) {
+					let acc = 0
+					for (let k = 0; k < ctx.colNum; ++k) {
+						if (ctx.matrix[i][k][j])
+							acc += 1
+					}
+					line.push(acc)
+				}
+				ctx.leftView.push(line)
+			}
+
+			ctx.upView = []
+			for (let i = 0; i < ctx.colNum; ++i) {
+				let line = []
+				for (let j = 0; j < ctx.layerNum; ++j) {
+					let acc = 0
+					for (let k = 0; k < ctx.rowNum; ++k) {
+						if (ctx.matrix[k][i][j])
+							acc += 1
+					}
+					line.push(acc)
+				}
+				ctx.upView.push(line)
+			}
+
+			ctx.leftDepth = []
+			ctx.leftLimit = []
+			for (let i = 0; i < ctx.rowNum; ++i) {
+				item = updateLimit(0, ctx.leftView[i])
+				ctx.leftDepth.push(item.depth)
+				ctx.leftLimit.push(item.limit)
+			}
+			ctx.upDepth = []
+			ctx.upLimit = []
+			for (let i = 0; i < ctx.colNum; ++i) {
+				item = updateLimit(0, ctx.upView[i])
+				ctx.upDepth.push(item.depth)
+				ctx.upLimit.push(item.limit)
+			}
+
+			ctx.usedView = []
+			for (let i = 0; i < ctx.rowNum; ++i) {
+				line = []
+				for (let j = 0; j < ctx.colNum; ++j) {
+					line.push(0)
+				}
+				ctx.usedView.push(line)
+			}
+		}
+
+		function init(ctx) {
+			ctx.canvas = document.getElementById('canvas')
+			ctx.context = ctx.canvas.getContext('2d')
+
+			ctx.rowNum = 6
+			ctx.colNum = 6
+			ctx.layerNum = 10
+
+			ctx.canvas.onclick = (event) => {
+				handleClick(event, ctx)
+			}
+
+			initSize(ctx)
+			initToken(ctx)
+
+			ctx.gameState = 'Ready'
+			console.log(ctx)
+		}
+
+		(function() {
+			let ctx = {}
+			init(ctx)
+			function loop(timestamp) {
+				run(timestamp, ctx)
+				window.requestAnimationFrame(loop)
+			}
+			window.requestAnimationFrame(loop)
+		}())
+	</script>
+
+</body>
+</html>
